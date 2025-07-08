@@ -1,0 +1,381 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <title>外観判定テスト（Firestore版）</title>
+  <link href="https://fonts.googleapis.com/css2?family=Zen+Maru+Gothic&display=swap" rel="stylesheet">
+  <style>
+    body {
+      font-family: "Zen Maru Gothic", sans-serif;
+      background: linear-gradient(to bottom, #ffeef8, #ffffff);
+      padding: 2rem;
+      color: #444;
+    }
+    h1, h2, h3 {
+      color: #d86a9f;
+    }
+    button {
+      background: #ffddee;
+      border: 2px solid #f6a4c9;
+      border-radius: 25px;
+      padding: 0.5rem 1.5rem;
+      margin: 0.5rem;
+      cursor: pointer;
+      box-shadow: 2px 2px 5px rgba(0,0,0,0.1);
+      font-weight: bold;
+    }
+    button:hover {
+      background: #ffe6f2;
+    }
+    input, select {
+      border: 2px solid #f6a4c9;
+      border-radius: 15px;
+      padding: 0.5rem 1rem;
+      margin: 0.3rem 0;
+    }
+    .section {
+      display: none;
+    }
+    .active {
+      display: block;
+    }
+    .card {
+      background: #fff;
+      border: 2px solid #f6a4c9;
+      border-radius: 20px;
+      padding: 1rem;
+      margin: 0.5rem;
+      width: 200px;
+      text-align: center;
+      display: inline-block;
+      cursor: pointer;
+      box-shadow: 2px 2px 5px rgba(0,0,0,0.1);
+    }
+    .quiz-card {
+      background: #fff0f5;
+      border: 2px solid #f6a4c9;
+      border-radius: 20px;
+      padding: 1rem;
+      max-width: 600px;
+      margin: 0 auto 1rem;
+      text-align: center;
+      box-shadow: 2px 2px 5px rgba(0,0,0,0.1);
+    }
+    .choices button {
+      margin: 0.5rem;
+      padding: 0.5rem 1.5rem;
+    }
+    .result {
+      margin-top: 0.5rem;
+      font-weight: bold;
+    }
+    #final-score {
+      margin-top: 2rem;
+      font-size: 1.2rem;
+      font-weight: bold;
+      text-align: center;
+      color: #d86a9f;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 1rem;
+      background: #fffafc;
+      border-radius: 12px;
+      overflow: hidden;
+    }
+    th, td {
+      border: 1px solid #f6a4c9;
+      padding: 0.5rem;
+      text-align: center;
+    }
+    #userList p {
+      cursor: pointer;
+      margin: 0.5rem 0;
+      background: #fff;
+      display: inline-block;
+      padding: 0.5rem 1rem;
+      border: 2px solid #f6a4c9;
+      border-radius: 15px;
+      box-shadow: 1px 1px 3px rgba(0,0,0,0.1);
+    }
+  </style>
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/9.6.1/firebase-app.js";
+    import { getFirestore, collection, addDoc, getDocs, query, where } from "https://www.gstatic.com/firebasejs/9.6.1/firebase-firestore.js";
+
+    const firebaseConfig = {
+      apiKey: "AIzaSyDy6V0bdBbxjVCPZsJMDOhUV_1ZZ3E2eig",
+      authDomain: "ninntei.firebaseapp.com",
+      projectId: "ninntei"
+    };
+
+    const app = initializeApp(firebaseConfig);
+    const db = getFirestore(app);
+
+    let categories = [];
+    let currentUser = '';
+
+    const quizData = [
+      { q: "Q1. 取付面にバリ残り0.2mm", a: false, reason: "取付面はバリ残り不可" },
+      { q: "Q2. 打痕 深さ0.2mm 長さ2.0mm", a: true, reason: "0.3mm以下はOK" },
+      { q: "Q3. 外周面キズ 幅2.0mm 長さ8mm", a: false, reason: "幅1.5mm以上はNG" },
+      { q: "Q4. 座ぐり底に凹み 深さ0.8mm", a: true, reason: "1.0mm以下ならOK" },
+      { q: "Q5. ザグリ穴にカエリ残り", a: false, reason: "カエリ残りはNG" }
+    ];
+    let selectedAnswers = [];
+    let isConfirmed = [];
+    let correctCount = 0;
+    let currentIndex = 0;
+
+    const home = document.getElementById('home');
+    const register = document.getElementById('register');
+    const roster = document.getElementById('roster');
+    const history = document.getElementById('history');
+    const test = document.getElementById('test');
+
+    function showSection(section) {
+      [home, register, roster, history, test].forEach(s => s.classList.remove('active'));
+      section.classList.add('active');
+    }
+
+    async function loadCategories() {
+      categories = [];
+      const snap = await getDocs(collection(db, "categories"));
+      snap.forEach(doc => categories.push(doc.data().name));
+      if (categories.length === 0) categories = ["下期定期テスト", "臨時テスト"];
+      updateCategorySelect();
+    }
+
+    function updateCategorySelect() {
+      const select = document.getElementById('testCategory');
+      select.innerHTML = '';
+      categories.forEach(c => {
+        const opt = document.createElement('option');
+        opt.value = c;
+        opt.textContent = c;
+        select.appendChild(opt);
+      });
+    }
+
+    document.getElementById('addCategoryBtn').onclick = async () => {
+      const newCat = document.getElementById('newCategory').value.trim();
+      if (newCat && !categories.includes(newCat)) {
+        await addDoc(collection(db, "categories"), { name: newCat });
+        categories.push(newCat);
+        updateCategorySelect();
+        document.getElementById('newCategory').value = '';
+      } else {
+        alert('区分名を入力してください、または既に存在しています');
+      }
+    };
+
+    document.getElementById('startBtn').onclick = async () => {
+      await updateRoster();
+      showSection(roster);
+    };
+    document.getElementById('registerBtn').onclick = () => showSection(register);
+    document.getElementById('historyBtn').onclick = () => {
+      showUserList();
+      showSection(history);
+    };
+
+    document.getElementById('addUserBtn').onclick = async () => {
+      const name = document.getElementById('newName').value.trim();
+      const pass = document.getElementById('newPass').value.trim();
+      if (name && pass) {
+        await addDoc(collection(db, "users"), { name, pass });
+        alert('登録しました');
+        document.getElementById('newName').value = '';
+        document.getElementById('newPass').value = '';
+      } else {
+        alert('名前とパスワードを入力してください');
+      }
+    };
+    document.getElementById('backHomeBtn').onclick = () => showSection(home);
+    document.getElementById('backHomeBtn2').onclick = () => showSection(home);
+
+    const rosterList = document.getElementById('rosterList');
+
+    async function updateRoster() {
+      rosterList.innerHTML = '';
+      const snap = await getDocs(collection(db, "users"));
+      snap.forEach(doc => {
+        const user = doc.data();
+        const card = document.createElement('div');
+        card.className = 'card';
+        card.textContent = user.name;
+        card.onclick = () => verifyPassword(user);
+        rosterList.appendChild(card);
+      });
+    }
+
+    function verifyPassword(user) {
+      const input = prompt(`${user.name} さんのパスワードを入力`);
+      if (input === user.pass) {
+        currentUser = user.name;
+        showSection(test);
+        startTest();
+      } else {
+        alert('パスワードが違います');
+      }
+    }
+
+    const container = document.getElementById('question-container');
+    const finalScore = document.getElementById('final-score');
+    const currentUserTag = document.getElementById('currentUser');
+    const postActions = document.getElementById('postActions');
+
+    function startTest() {
+      currentUserTag.textContent = `受験者: ${currentUser}`;
+      selectedAnswers = Array(quizData.length).fill(null);
+      isConfirmed = Array(quizData.length).fill(false);
+      correctCount = 0;
+      currentIndex = 0;
+      finalScore.innerHTML = '';
+      postActions.innerHTML = '';
+      showQuestion(currentIndex);
+    }
+
+    function showQuestion(index) {
+      container.innerHTML = '';
+      const card = document.createElement('div');
+      card.className = 'quiz-card';
+      const question = document.createElement('p');
+      question.textContent = quizData[index].q;
+      card.appendChild(question);
+
+      const choices = document.createElement('div');
+      choices.className = 'choices';
+
+      const btnOK = document.createElement('button');
+      btnOK.textContent = 'OK';
+      btnOK.onclick = () => selectAnswer(index, true, btnOK, btnNG);
+      choices.appendChild(btnOK);
+
+      const btnNG = document.createElement('button');
+      btnNG.textContent = 'NG';
+      btnNG.onclick = () => selectAnswer(index, false, btnNG, btnOK);
+      choices.appendChild(btnNG);
+
+      card.appendChild(choices);
+
+      const result = document.createElement('div');
+      result.className = 'result';
+      result.id = 'result-' + index;
+      card.appendChild(result);
+
+      const nextBtn = document.createElement('button');
+      nextBtn.textContent = index === quizData.length - 1 ? '採点する / 次へ' : '次へ';
+      nextBtn.id = 'nextBtn';
+      nextBtn.disabled = true;
+      nextBtn.onclick = () => handleNext(index);
+      card.appendChild(nextBtn);
+
+      container.appendChild(card);
+    }
+
+    function selectAnswer(index, answer, selectedBtn, otherBtn) {
+      selectedAnswers[index] = answer;
+      selectedBtn.style.backgroundColor = '#8f8';
+      otherBtn.style.backgroundColor = '';
+      document.getElementById('nextBtn').disabled = false;
+    }
+
+    async function handleNext(index) {
+      if (selectedAnswers[index] === null) return;
+      const resultDiv = document.getElementById('result-' + index);
+      if (!isConfirmed[index]) {
+        const userAnswer = selectedAnswers[index];
+        const correct = quizData[index].a;
+        if (userAnswer === correct) {
+          resultDiv.innerHTML = "✅ 正解！ " + quizData[index].reason;
+          resultDiv.style.color = "green";
+          correctCount++;
+        } else {
+          resultDiv.innerHTML = "❌ 不正解！ " + quizData[index].reason;
+          resultDiv.style.color = "red";
+        }
+        isConfirmed[index] = true;
+      } else {
+        currentIndex++;
+        if (index === quizData.length - 1) {
+          await saveResult();
+          showFinalScore();
+        } else {
+          showQuestion(currentIndex);
+        }
+      }
+    }
+
+    async function saveResult() {
+      const snap = await getDocs(query(collection(db, "logs"), where("name", "==", currentUser)));
+      const now = new Date().toLocaleString();
+      const testCategory = document.getElementById('testCategory').value;
+      const trial = snap.docs.filter(log => log.data().testCategory === testCategory).length + 1;
+      const result = (correctCount === quizData.length) ? "合格" : "不合格";
+      await addDoc(collection(db, "logs"), { name: currentUser, testCategory, date: now, result, trial });
+    }
+
+    function showFinalScore() {
+      container.innerHTML = '';
+      const scoreText = `あなたの正解数：${correctCount} / ${quizData.length}`;
+      const pass = correctCount === quizData.length
+        ? "✅ 全問正解！合格です！"
+        : "❌ 不合格です。全問正解するまでやり直してください！";
+      finalScore.innerHTML = `${scoreText}<br>${pass}`;
+      postActions.innerHTML = `
+        <button onclick="showSection(home)">ホームへ戻る</button>
+        <button onclick="startTest()">同じテストをもう一度やる</button>
+      `;
+    }
+
+    async function showUserList() {
+      const div = document.getElementById('userList');
+      div.innerHTML = '';
+      const logsSnap = await getDocs(collection(db, "logs"));
+      const usersSnap = await getDocs(collection(db, "users"));
+      usersSnap.forEach(uDoc => {
+        const user = uDoc.data();
+        const userLogs = [];
+        logsSnap.forEach(l => { if (l.data().name === user.name) userLogs.push(l.data()); });
+        const latest = userLogs[userLogs.length - 1];
+        const latestResult = latest ? latest.result : '未実施';
+
+        const p = document.createElement('p');
+        p.innerHTML = `<strong>${user.name}</strong>　${latestResult}`;
+        p.onclick = () => showPersonalLogs(user.name);
+        div.appendChild(p);
+      });
+    }
+
+    async function showPersonalLogs(name) {
+      const snap = await getDocs(query(collection(db, "logs"), where("name", "==", name)));
+      const tbody = document.getElementById('personalTable');
+      tbody.innerHTML = '';
+      if (snap.empty) {
+        tbody.innerHTML = `<tr><td colspan="4">履歴なし</td></tr>`;
+        return;
+      }
+      snap.forEach(log => {
+        const d = log.data();
+        tbody.innerHTML += `<tr>
+          <td>${d.trial}</td>
+          <td>${d.testCategory}</td>
+          <td>${d.date}</td>
+          <td>${d.result}</td>
+        </tr>`;
+      });
+    }
+
+    // 初期ロード
+    loadCategories();
+  </script>
+</head>
+<body>
+  <h1>外観判定テスト（Firestore版）</h1>
+
+  <!-- 以下：ホーム画面・登録画面・名簿選択・履歴・テスト画面は前と同じでOK -->
+  <!-- 略 -->
+</body>
+</html>
