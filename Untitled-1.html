@@ -11,9 +11,7 @@
       padding: 2rem;
       color: #444;
     }
-    h1, h2, h3 {
-      color: #d86a9f;
-    }
+    h1, h2, h3 { color: #d86a9f; }
     button {
       background: #ffddee;
       border: 2px solid #f6a4c9;
@@ -24,21 +22,15 @@
       box-shadow: 2px 2px 5px rgba(0,0,0,0.1);
       font-weight: bold;
     }
-    button:hover {
-      background: #ffe6f2;
-    }
+    button:hover { background: #ffe6f2; }
     input, select {
       border: 2px solid #f6a4c9;
       border-radius: 15px;
       padding: 0.5rem 1rem;
       margin: 0.3rem 0;
     }
-    .section {
-      display: none;
-    }
-    .active {
-      display: block;
-    }
+    .section { display: none; }
+    .active { display: block; }
     .card {
       background: #fff;
       border: 2px solid #f6a4c9;
@@ -61,14 +53,8 @@
       text-align: center;
       box-shadow: 2px 2px 5px rgba(0,0,0,0.1);
     }
-    .choices button {
-      margin: 0.5rem;
-      padding: 0.5rem 1.5rem;
-    }
-    .result {
-      margin-top: 0.5rem;
-      font-weight: bold;
-    }
+    .choices button { margin: 0.5rem; padding: 0.5rem 1.5rem; }
+    .result { margin-top: 0.5rem; font-weight: bold; }
     #final-score {
       margin-top: 2rem;
       font-size: 1.2rem;
@@ -100,6 +86,62 @@
       box-shadow: 1px 1px 3px rgba(0,0,0,0.1);
     }
   </style>
+</head>
+<body>
+  <h1>外観判定テスト（Firestore版）</h1>
+
+  <!-- ホーム画面 -->
+  <div id="home" class="section active">
+    <h3>テスト区分</h3>
+    <select id="testCategory"></select><br>
+    <input type="text" id="newCategory" placeholder="新しい区分">
+    <button id="addCategoryBtn">追加</button><br><br>
+    <button id="startBtn">テスト開始</button>
+    <button id="registerBtn">受験者登録</button>
+    <button id="historyBtn">登録者一覧</button>
+  </div>
+
+  <!-- 登録画面 -->
+  <div id="register" class="section">
+    <h2>受験者登録</h2>
+    <input type="text" id="newName" placeholder="名前">
+    <input type="password" id="newPass" placeholder="パスワード">
+    <button id="addUserBtn">追加</button>
+    <button id="backHomeBtn">ホームへ戻る</button>
+  </div>
+
+  <!-- 名簿選択画面 -->
+  <div id="roster" class="section">
+    <h2>受験者選択</h2>
+    <div id="rosterList"></div>
+    <button id="backHomeBtn2">ホームへ戻る</button>
+  </div>
+
+  <!-- 履歴画面 -->
+  <div id="history" class="section">
+    <h2>登録者一覧</h2>
+    <div id="userList"></div>
+    <h3>選択した人の履歴</h3>
+    <table>
+      <thead>
+        <tr>
+          <th>回数</th><th>テスト区分</th><th>日時</th><th>結果</th>
+        </tr>
+      </thead>
+      <tbody id="personalTable"></tbody>
+    </table>
+    <button id="backHomeBtn3">ホームへ戻る</button>
+  </div>
+
+  <!-- テスト画面 -->
+  <div id="test" class="section">
+    <h2>テスト実施中</h2>
+    <p id="currentUser"></p>
+    <div id="question-container"></div>
+    <div id="final-score"></div>
+    <div id="postActions"></div>
+  </div>
+
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/9.6.1/firebase-app.js";
     import { getFirestore, collection, addDoc, getDocs, query, where } from "https://www.gstatic.com/firebasejs/9.6.1/firebase-firestore.js";
@@ -109,7 +151,6 @@
       authDomain: "ninntei.firebaseapp.com",
       projectId: "ninntei"
     };
-
     const app = initializeApp(firebaseConfig);
     const db = getFirestore(app);
 
@@ -138,6 +179,7 @@
       [home, register, roster, history, test].forEach(s => s.classList.remove('active'));
       section.classList.add('active');
     }
+    window.showSection = showSection;
 
     async function loadCategories() {
       categories = [];
@@ -170,16 +212,9 @@
       }
     };
 
-    document.getElementById('startBtn').onclick = async () => {
-      await updateRoster();
-      showSection(roster);
-    };
+    document.getElementById('startBtn').onclick = async () => { await updateRoster(); showSection(roster); };
     document.getElementById('registerBtn').onclick = () => showSection(register);
-    document.getElementById('historyBtn').onclick = () => {
-      showUserList();
-      showSection(history);
-    };
-
+    document.getElementById('historyBtn').onclick = () => { showUserList(); showSection(history); };
     document.getElementById('addUserBtn').onclick = async () => {
       const name = document.getElementById('newName').value.trim();
       const pass = document.getElementById('newPass').value.trim();
@@ -194,6 +229,7 @@
     };
     document.getElementById('backHomeBtn').onclick = () => showSection(home);
     document.getElementById('backHomeBtn2').onclick = () => showSection(home);
+    document.getElementById('backHomeBtn3').onclick = () => showSection(home);
 
     const rosterList = document.getElementById('rosterList');
 
@@ -236,7 +272,6 @@
       postActions.innerHTML = '';
       showQuestion(currentIndex);
     }
-
     function showQuestion(index) {
       container.innerHTML = '';
       const card = document.createElement('div');
@@ -341,9 +376,8 @@
         logsSnap.forEach(l => { if (l.data().name === user.name) userLogs.push(l.data()); });
         const latest = userLogs[userLogs.length - 1];
         const latestResult = latest ? latest.result : '未実施';
-
         const p = document.createElement('p');
-        p.innerHTML = `<strong>${user.name}</strong>　${latestResult}`;
+        p.innerHTML = `<strong>${user.name}</strong> ${latestResult}`;
         p.onclick = () => showPersonalLogs(user.name);
         div.appendChild(p);
       });
@@ -368,14 +402,7 @@
       });
     }
 
-    // 初期ロード
     loadCategories();
   </script>
-</head>
-<body>
-  <h1>外観判定テスト（Firestore版）</h1>
-
-  <!-- 以下：ホーム画面・登録画面・名簿選択・履歴・テスト画面は前と同じでOK -->
-  <!-- 略 -->
 </body>
 </html>
